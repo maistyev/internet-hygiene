@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Цифровий слід і репутація</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=IBM+Plex+Mono:wght@400;600&family=Roboto+Condensed:wght@600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+/* VOICE: зошит учня, спокійно й по-дружньому; вчитель показує в Meet, учні клацають самі.
+   IDEA: аркуші зошита в клітинку (дизайн-система «Інженерний зошит»), сліди ручкою на полях.
+   PICTURE: профіль, від якого тягнеться ланцюжок слідів — кожен крок підписано.
+   COLOUR and TYPE: папір, синя ручка, один помаранчевий акцент; Roboto Condensed + IBM Plex + Caveat.
+   LAYOUT: аркуші один під одним, на кожному — одна думка й одна гра. */
+:root{
+  --paper:#f5f2e9; --paper-raised:#fffdf7; --sticky:#fff0a8; --grid:#c6d4e2; --margin-line:#e07a7c;
+  --ink:#1a2236; --ink-muted:#3f4555; --rule:#7a808b; --pen:#1f47a6; --signal:#ea5a16; --signal-ink:#b8410a;
+  --on-signal:#1a2236; --marker:#ffe066; --on-marker:#1a2236; --check:#1b7543; --error:#c42b2b;
+  --desk:#e7e1d1; --wash:#e3e9f5; --tape:rgba(255,255,255,.55);
+  --shadow-glued:0 2px 0 #1a223614, 0 10px 18px -12px #1a223659;
+  --font-display:"Roboto Condensed","IBM Plex Sans Condensed","Arial Narrow",sans-serif;
+  --font-sans:"IBM Plex Sans","Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",Consolas,monospace;
+  --font-hand:Caveat,"Segoe Print",cursive;
+  --cell:24px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#14335f; --paper-raised:#1c4176; --sticky:#ffe58a; --grid:#2a5088; --margin-line:#f08c8c;
+  --ink:#eef3fb; --ink-muted:#d3dfef; --rule:#7e9bc6; --pen:#9fd4ff; --signal:#ff8a3d; --signal-ink:#ff9b57;
+  --on-signal:#14223b; --marker:#ffd84d; --on-marker:#14223b; --check:#74d9a0; --error:#ff8f85;
+  --desk:#0d2546; --wash:#24508c; --tape:rgba(255,255,255,.28);
+  --shadow-glued:0 2px 0 #0000002e, 0 10px 18px -12px #00000080; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#14335f; --paper-raised:#1c4176; --sticky:#ffe58a; --grid:#2a5088; --margin-line:#f08c8c;
+  --ink:#eef3fb; --ink-muted:#d3dfef; --rule:#7e9bc6; --pen:#9fd4ff; --signal:#ff8a3d; --signal-ink:#ff9b57;
+  --on-signal:#14223b; --marker:#ffd84d; --on-marker:#14223b; --check:#74d9a0; --error:#ff8f85;
+  --desk:#0d2546; --wash:#24508c; --tape:rgba(255,255,255,.28);
+  --shadow-glued:0 2px 0 #0000002e, 0 10px 18px -12px #00000080; color-scheme:dark}
+
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:64px}
+body{margin:0;background:var(--desk);color:var(--ink);font-family:var(--font-sans);font-size:17px;line-height:1.55;
+  padding:0 16px 56px;-webkit-font-smoothing:antialiased;overflow-x:clip}
+:focus-visible{outline:3px solid var(--pen);outline-offset:2px}
+button,input,textarea{font:inherit;color:inherit}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* ── Верхня панель ── */
+.topbar{position:sticky;top:0;z-index:40;margin-inline:-16px;background:var(--paper-raised);border-bottom:2px solid var(--ink)}
+.topbar-in{display:flex;align-items:center;gap:18px;max-width:1600px;margin:0 auto;padding:8px 16px}
+.topbar-t{font-family:var(--font-mono);font-weight:600;font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.topnav{display:flex;gap:4px;overflow-x:auto;min-width:0;scrollbar-width:thin}
+.topnav a{font-family:var(--font-mono);font-weight:600;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--pen);text-decoration:none;padding:5px 9px;border:2px solid transparent;white-space:nowrap}
+.topnav a:hover,.topnav a.is-on{border-color:var(--pen)}
+@media (max-width:820px){.topbar-t{display:none}}
+
+/* ── Аркуш ── */
+.sheet{position:relative;max-width:1240px;margin:28px auto 0;background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:var(--cell) var(--cell);border:1px solid var(--rule);
+  padding:calc(var(--cell)*2) calc(var(--cell)*7) calc(var(--cell)*3.5) calc(var(--cell)*2)}
+.sheet::before{content:"";position:absolute;top:0;bottom:0;right:calc(var(--cell)*5);width:3px;background:var(--margin-line)}
+.margin{position:absolute;top:calc(var(--cell)*2);right:0;width:calc(var(--cell)*5);display:flex;flex-direction:column;align-items:center;gap:calc(var(--cell)*3);
+  font-family:var(--font-hand);font-weight:600;font-size:28px;line-height:1.05;color:var(--pen);text-align:center;padding-inline:8px;pointer-events:none}
+.margin .big{font-size:44px}
+.margin .ring{border:3px solid var(--signal);border-radius:50%;padding:6px 8px;transform:rotate(-4deg)}
+.stamp{position:absolute;right:10px;bottom:10px;display:flex;height:30px;background:var(--paper-raised);border:2px solid var(--ink);
+  font-family:var(--font-mono);font-weight:600;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-muted);white-space:nowrap;z-index:2}
+.stamp span{display:flex;align-items:center;padding:0 9px;border-left:2px solid var(--rule)}
+.stamp span:first-child{border-left:0;color:var(--ink)}
+.stamp span:last-child{color:var(--ink)}
+.stack{display:flex;flex-direction:column;gap:calc(var(--cell)*1.5)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--cell)*2);align-items:start}
+.cols--60{grid-template-columns:3fr 2fr}
+.cols > *{min-width:0}
+@media (max-width:900px){.cols,.cols--60{grid-template-columns:1fr}}
+@media (max-width:720px){
+  .sheet{--cell:20px;padding:30px 36px 66px 16px}
+  .sheet::before{right:18px}
+  .margin{display:none}
+  .stamp span:nth-child(2){display:none}
+}
+
+/* ── Текст ── */
+.label{font-family:var(--font-mono);font-weight:600;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--pen)}
+.display{font-family:var(--font-display);font-weight:700;font-size:clamp(38px,6vw,72px);line-height:1;letter-spacing:-.01em;text-wrap:balance;margin:10px 0 0}
+.h2{font-family:var(--font-display);font-weight:700;font-size:clamp(30px,3.9vw,46px);line-height:1.06;text-wrap:balance;margin:8px 0 0}
+.h3{font-family:var(--font-display);font-weight:600;font-size:clamp(22px,2.2vw,27px);line-height:1.15;text-wrap:balance;margin:0}
+.lead{font-size:clamp(18px,1.6vw,21px);line-height:1.5;margin:0;max-width:62ch}
+.muted{color:var(--ink-muted)}
+p{margin:0;max-width:66ch}
+.hand{font-family:var(--font-hand);font-weight:600;color:var(--pen);font-size:1.5em;line-height:1}
+mark,.hl{color:var(--on-marker);background:linear-gradient(177deg,transparent 10%,var(--marker) 12%,var(--marker) 90%,transparent 93%);padding:0 .14em}
+.ok{color:var(--check)} .bad{color:var(--error)}
+.mark{display:inline-block;width:1em;height:1em;vertical-align:-.12em;background:var(--mk,var(--pen));flex:none;
+  -webkit-mask:var(--shape) center/100% 100% no-repeat;mask:var(--shape) center/100% 100% no-repeat}
+.mark--check{--mk:var(--check);--shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M8 35 C 14 40, 19 46, 24 55 C 32 37, 43 21, 58 8' fill='none' stroke='%23000' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}
+.mark--cross{--mk:var(--error);--shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M12 11 C 25 25, 39 40, 53 55 M 53 10 C 40 23, 25 40, 10 54' fill='none' stroke='%23000' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E")}
+.mark--dash{--mk:var(--ink-muted);--shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M12 34 C 26 31, 40 33, 52 31' fill='none' stroke='%23000' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E")}
+
+/* ── Блоки ── */
+.def{position:relative;border:3px solid var(--pen);padding:26px 22px 20px}
+.def-tag{position:absolute;top:0;left:16px;transform:translateY(-55%);background:var(--paper);padding:0 8px;font-family:var(--font-mono);font-weight:600;font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--pen)}
+.def .h3{margin-bottom:8px}
+.sticky{position:relative;background:var(--sticky);color:var(--on-marker);border-radius:2px;box-shadow:var(--shadow-glued);transform:rotate(-1.4deg);padding:28px 24px 22px;max-width:380px}
+.sticky::before{content:"";position:absolute;top:-9px;left:50%;width:96px;height:20px;transform:translateX(-50%) rotate(2.5deg);background:var(--tape)}
+.sticky-t{font-family:var(--font-hand);font-weight:600;font-size:32px;line-height:1;margin-bottom:8px}
+.raised{background:var(--paper-raised);border:2px solid var(--rule);padding:18px 20px}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;border:2px solid var(--pen);color:var(--pen);background:var(--paper-raised);padding:7px 14px;font-weight:600;font-size:15px;cursor:pointer;border-radius:0;line-height:1.3;text-align:left}
+.btn:hover{background:var(--wash)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:disabled:hover{background:var(--paper-raised)}
+.btn.is-on{background:var(--pen);color:var(--paper-raised)}
+.btn.is-ok{border-color:var(--check);color:var(--check)}
+.btn.is-bad{border-color:var(--error);color:var(--error);text-decoration:line-through}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.seg{display:inline-flex;flex-wrap:wrap;border:2px solid var(--pen)}
+.seg button{border:0;background:var(--paper-raised);color:var(--pen);font-weight:600;padding:9px 14px;min-height:42px;cursor:pointer}
+.seg button + button{border-left:2px solid var(--pen)}
+.seg button.is-on{background:var(--pen);color:var(--paper-raised)}
+.tbl{width:100%;border-collapse:collapse;background:var(--paper-raised)}
+.tbl th,.tbl td{border:2px solid var(--rule);padding:9px 12px;text-align:left;vertical-align:top;font-size:16px}
+.tbl th{font-family:var(--font-mono);font-weight:600;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--pen)}
+.tbl td.num{text-align:right;white-space:nowrap;font-family:var(--font-mono);font-weight:600}
+.tbl .demo td{color:var(--ink-muted);font-style:italic}
+.tbl-wrap{overflow-x:auto}
+.score{font-weight:600;font-size:15px;color:var(--ink-muted)}
+.fb{display:flex;gap:8px;align-items:baseline;font-size:15.5px}
+.fb:empty{display:none}
+.fb .mark{width:20px;height:20px;align-self:center}
+
+/* Кроки */
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px;counter-reset:s}
+.steps > li{position:relative;display:grid;grid-template-columns:40px 1fr;column-gap:14px;counter-increment:s}
+.steps > li::before{content:counter(s);display:grid;place-items:center;width:40px;height:40px;border:3px solid var(--pen);border-radius:50%;font-family:var(--font-mono);font-weight:600;color:var(--pen);background:var(--paper)}
+.steps > li:not(:last-child)::after{content:"";position:absolute;left:20px;top:44px;bottom:-12px;border-left:2px dashed var(--rule)}
+.steps > li.is-active::before{background:var(--signal);border-color:var(--signal);color:var(--on-signal)}
+.steps b{display:block;font-weight:600;font-size:18px;line-height:1.3;padding-top:7px}
+.steps span{color:var(--ink-muted);font-size:15.5px}
+
+/* Титульний */
+.title-grid{display:grid;grid-template-columns:3fr 2fr;gap:calc(var(--cell)*2);align-items:center}
+.title-grid > *{min-width:0}
+.hero{color:var(--pen);width:100%;height:auto;max-width:460px;justify-self:center}
+.hero .fp{opacity:0;animation:fp .5s ease forwards}
+.hero text{font-family:var(--font-hand);font-weight:600;font-size:25px;fill:currentColor}
+@keyframes fp{to{opacity:1}}
+.toc{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:2px 18px;counter-reset:t}
+.toc a{display:grid;grid-template-columns:30px 1fr;gap:8px;align-items:baseline;color:var(--ink);text-decoration:none;padding:4px 0;font-size:17px;counter-increment:t}
+.toc a::before{content:counter(t);font-family:var(--font-mono);font-weight:600;color:var(--pen);font-size:14px}
+.toc a:hover span{text-decoration:underline;text-decoration-color:var(--pen);text-underline-offset:4px}
+@media (max-width:900px){.title-grid{grid-template-columns:1fr}.hero{max-width:340px}}
+
+/* Активний / пасивний */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.two > div{min-width:0}
+@media (max-width:640px){.two{grid-template-columns:1fr}}
+.kind{background:var(--paper-raised);border:2px solid var(--rule);padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+.kind ul{margin:0;padding-left:1.1em}
+.kind .when{border-top:2px dashed var(--rule);padding-top:8px;font-size:15px;color:var(--ink-muted)}
+
+/* Гра А/П */
+.quiz{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none}
+.quiz > li{display:grid;grid-template-columns:1fr auto;gap:8px 16px;align-items:center;padding:12px 14px;background:var(--paper-raised);border:2px solid var(--rule)}
+.quiz > li > p{min-width:0}
+.quiz .fb{grid-column:1/-1}
+.quiz .n{font-family:var(--font-mono);font-weight:600;color:var(--pen);margin-right:6px}
+@media (max-width:640px){.quiz > li{grid-template-columns:1fr}}
+.ap .btn{min-width:118px;justify-content:center}
+
+/* Видалений допис */
+.post{background:var(--paper-raised);border:2px solid var(--ink);padding:16px 18px;display:flex;flex-direction:column;gap:10px;transition:opacity .4s}
+.post-h{display:flex;gap:10px;align-items:center}
+.ava{width:42px;height:42px;border-radius:50%;border:2px solid var(--pen);flex:none;background:repeating-linear-gradient(45deg,transparent 0 5px,var(--wash) 5px 8px)}
+.post-n{font-weight:600}
+.post-n small{display:block;font-weight:400;color:var(--ink-muted);font-size:13.5px}
+.post-img{height:120px;border:2px dashed var(--rule);display:grid;place-items:center;font-family:var(--font-mono);font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-muted)}
+.post-f{display:flex;gap:16px;font-family:var(--font-mono);font-size:13.5px;color:var(--ink-muted)}
+.post.is-del{opacity:.35}
+.post.is-del .post-body{text-decoration:line-through;text-decoration-color:var(--error)}
+.gone{font-family:var(--font-hand);font-size:30px;color:var(--error);font-weight:600}
+.traces{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.traces li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:10px 12px;background:var(--paper-raised);border:2px solid var(--pen);opacity:0;transform:translateY(6px);transition:.35s}
+.traces li.is-on{opacity:1;transform:none}
+.traces .tag{font-family:var(--font-mono);font-weight:600;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--pen);border:2px solid var(--pen);padding:1px 6px;white-space:nowrap}
+
+/* Хто дивиться */
+.viewers{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:12px}
+.viewer{background:var(--paper-raised);border:2px solid var(--rule);padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.viewer.v-ok{border-color:var(--check)}
+.viewer.v-bad{border-color:var(--error)}
+.viewer .who{font-family:var(--font-mono);font-weight:600;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--pen)}
+.viewer .say{font-family:var(--font-hand);font-weight:600;font-size:25px;line-height:1.1;color:var(--ink)}
+.viewer .v{display:flex;gap:6px;align-items:center;font-size:14.5px;color:var(--ink-muted)}
+.viewer .v .mark{width:18px;height:18px}
+
+/* Ситуації */
+.case{background:var(--paper-raised);border:3px solid var(--ink);padding:22px 24px;display:flex;flex-direction:column;gap:16px}
+.case-q{font-family:var(--font-display);font-weight:700;font-size:clamp(24px,2.6vw,32px);line-height:1.15;text-wrap:balance}
+.opts3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.opts3 .btn{justify-content:flex-start}
+.opts3 .btn b{font-family:var(--font-mono);display:grid;place-items:center;width:28px;height:28px;border:2px solid currentColor;border-radius:50%;font-size:14px;flex:none}
+@media (max-width:640px){.opts3{grid-template-columns:1fr}}
+.dots{display:flex;gap:6px;flex-wrap:wrap}
+.dots i{width:14px;height:14px;border:2px solid var(--pen);border-radius:50%}
+.dots i.is-ok{background:var(--check);border-color:var(--check)}
+.dots i.is-bad{background:var(--error);border-color:var(--error)}
+.dots i.is-cur{outline:3px solid var(--signal);outline-offset:2px}
+
+/* Конструктор профілю */
+.pb{display:grid;grid-template-columns:minmax(0,3fr) minmax(280px,2fr);gap:24px;align-items:start}
+@media (max-width:960px){.pb{grid-template-columns:1fr}.pb .card{order:-1;position:static}}
+.pb fieldset{border:0;margin:0 0 16px;padding:0;display:flex;flex-direction:column;gap:6px}
+.pb legend{font-family:var(--font-mono);font-weight:600;font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--pen);margin-bottom:6px;padding:0}
+.pb .row{display:flex;flex-wrap:wrap;gap:6px}
+.pb .row .btn{font-size:14.5px;min-height:40px;padding:6px 11px}
+.pb .tip{font-size:14.5px;color:var(--ink-muted);min-height:22px;display:flex;gap:6px;align-items:baseline}
+.pb .tip .mark{width:16px;height:16px;align-self:center}
+.card{background:var(--paper-raised);border:2px solid var(--ink);box-shadow:var(--shadow-glued);padding:18px;display:flex;flex-direction:column;gap:12px;position:sticky;top:76px}
+.card-h{display:flex;gap:14px;align-items:center}
+.card-ava{width:84px;height:84px;border-radius:50%;border:3px solid var(--pen);flex:none;overflow:hidden;color:var(--pen);background:var(--paper)}
+.card-ava svg{width:100%;height:100%;display:block}
+.card-nick{font-family:var(--font-mono);font-weight:600;font-size:17px;overflow-wrap:anywhere}
+.card-lock{font-size:13.5px;color:var(--ink-muted)}
+.card-bio{font-size:15.5px;min-height:24px}
+.card-geo{font-size:13.5px;color:var(--ink-muted)}
+.meter{position:relative;height:18px;border:2px solid var(--ink);background:var(--paper)}
+.meter i{position:absolute;left:0;top:0;bottom:0;background:var(--check);transition:width .3s,background .3s}
+.meter i.mid{background:var(--signal)}
+.meter i.hi{background:var(--error)}
+.verdict{font-family:var(--font-hand);font-weight:600;font-size:30px;line-height:1.05}
+
+/* Фільтр */
+.flt textarea{width:100%;min-height:110px;resize:vertical;font-size:16px;padding:12px 14px;border:2px solid var(--pen);background:var(--paper-raised);border-radius:0}
+.flt .qrow{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:8px 12px;background:var(--paper-raised);border:2px solid var(--rule)}
+.flt .qrow.is-no{border-color:var(--error)}
+.flt .qrow .seg button{padding:6px 14px;min-height:38px}
+@media (max-width:560px){.flt .qrow{grid-template-columns:1fr}}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{border:2px solid var(--error);color:var(--error);padding:2px 9px;font-weight:600;font-size:14px;background:var(--paper-raised)}
+.chip.ok{border-color:var(--check);color:var(--check)}
+.out{border:3px solid var(--rule);padding:12px 16px;display:flex;gap:10px;align-items:center;background:var(--paper-raised);font-weight:600}
+.out.is-ok{border-color:var(--check);color:var(--check)}
+.out.is-bad{border-color:var(--error);color:var(--error)}
+.out .mark{width:24px;height:24px}
+
+/* Перевір себе */
+.tq{display:flex;flex-direction:column;gap:14px;counter-reset:q}
+.tq fieldset{border:2px solid var(--rule);background:var(--paper-raised);margin:0;padding:12px 16px;display:flex;flex-direction:column;gap:4px;counter-increment:q}
+.tq legend{font-weight:600;padding:0 6px}
+.tq legend::before{content:counter(q) ". ";font-family:var(--font-mono);color:var(--pen)}
+.tq label{display:flex;gap:10px;align-items:center;cursor:pointer;padding:6px 4px;min-height:40px}
+.tq input{accent-color:var(--pen);width:19px;height:19px;flex:none}
+.tq label.is-ok{color:var(--check);font-weight:600}
+.tq label.is-bad{color:var(--error);text-decoration:line-through}
+.tq fieldset.done-ok{border-color:var(--check)}
+.tq fieldset.done-bad{border-color:var(--error)}
+.big-score{font-family:var(--font-hand);font-weight:600;font-size:44px;color:var(--pen);line-height:1}
+
+.stack > .seg{align-self:flex-start}
+.foot{max-width:1240px;margin:22px auto 0;font-size:14px;color:var(--ink-muted)}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <span class="topbar-t">Урок 26 · цифровий слід</span>
+    <nav class="topnav" aria-label="Зміст">
+      <a href="#slid">Слід</a><a href="#gra">Гра А/П</a><a href="#steraty">Стерти?</a><a href="#reputatsiia">Репутація</a>
+      <a href="#sytuatsii">Публікувати?</a><a href="#profil">Профіль</a><a href="#filtr">Фільтр</a><a href="#dopomoha">Якщо ображають</a>
+      <a href="#perevir">Перевір себе</a><a href="#dz">Д/з</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<!-- 1 · Титульний -->
+<section class="sheet" id="pochatok" aria-labelledby="t1">
+  <div class="title-grid">
+    <div class="stack">
+      <div>
+        <div class="label">Інформатика · 6 клас · урок 26</div>
+        <h1 class="display" id="t1">Що інтернет пам’ятає про&nbsp;тебе?</h1>
+      </div>
+      <p class="lead">Кожен лайк, пошук і фото залишають слід. З таких слідів інші складають думку про тебе. Тут можна погратися з цим: стерти допис, зібрати безпечний профіль і перевірити чернетку перед публікацією.</p>
+      <ol class="toc">
+        <li><a href="#slid"><span>Що таке цифровий слід</span></a></li>
+        <li><a href="#gra"><span>Гра «Активний чи пасивний?»</span></a></li>
+        <li><a href="#steraty"><span>Чи можна стерти слід</span></a></li>
+        <li><a href="#reputatsiia"><span>Цифрова репутація</span></a></li>
+        <li><a href="#sytuatsii"><span>Гра «Публікувати чи ні?»</span></a></li>
+        <li><a href="#profil"><span>Збери безпечний профіль</span></a></li>
+        <li><a href="#filtr"><span>Фільтр перед публікацією</span></a></li>
+        <li><a href="#dopomoha"><span>Якщо в мережі ображають</span></a></li>
+        <li><a href="#perevir"><span>Перевір себе</span></a></li>
+        <li><a href="#dz"><span>Домашнє завдання</span></a></li>
+      </ol>
+    </div>
+    <svg class="hero" viewBox="0 0 470 552" role="img" aria-label="Профіль, від якого тягнеться ланцюжок слідів: лайк, пошук, фото, коментар, геомітка">
+      <defs><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2.5" height="8" fill="currentColor"/></pattern></defs>
+      <g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+        <rect x="20" y="16" width="290" height="190"/>
+        <path d="M20 50H310"/>
+        <circle cx="74" cy="104" r="30" fill="url(#hatch)"/>
+        <path d="M124 92H280M124 120H240M44 160H286M44 184H230"/>
+      </g>
+      <g id="trail"></g>
+    </svg>
+  </div>
+  <div class="margin" aria-hidden="true"><span class="ring">урок 26</span><span>почни звідси</span></div>
+  <div class="stamp"><span>Інф · 6</span><span>Цифровий слід</span><span>Ур. 26</span><span>Арк. 1</span></div>
+</section>
+
+<!-- 2 · Цифровий слід -->
+<section class="sheet" id="slid" aria-labelledby="t2">
+  <div class="stack">
+    <div>
+      <div class="label">Тема 2 · цифровий слід</div>
+      <h2 class="h2" id="t2">Що таке цифровий слід?</h2>
+    </div>
+    <div class="def"><span class="def-tag">Означення</span>
+      <p class="lead"><mark>Цифровий слід</mark> — уся інформація про людину, яку вона залишає, коли користується інтернетом. Як сліди на снігу: видно, де ти пройшов, навіть коли тебе там уже нема.</p>
+    </div>
+    <div class="two">
+      <div class="kind">
+        <div class="label">Активний</div>
+        <h3 class="h3">Залишаєш сам</h3>
+        <ul><li>допис, фото, сторіс</li><li>коментар, лайк, відгук</li><li>нікнейм і аватар у грі</li></ul>
+        <div class="when">Ти знаєш, що публікуєш, і це бачать інші.</div>
+      </div>
+      <div class="kind">
+        <div class="label">Пасивний</div>
+        <h3 class="h3">Збирається без тебе</h3>
+        <ul><li>історія пошуку й переглядів</li><li>місце, де був телефон</li><li>які сайти й ігри ти відкривав</li></ul>
+        <div class="when">Сервіси збирають це автоматично, часто без твого відома.</div>
+      </div>
+    </div>
+    <div class="sticky"><div class="sticky-t">Як відрізнити</div>Ти сам(-а) виклав(-ла) це, щоб побачили інші? <b>Так</b> — активний. Дані зібралися самі — <b>пасивний</b>.</div>
+  </div>
+  <div class="margin" aria-hidden="true"><span>підр. с. 110</span></div>
+  <div class="stamp"><span>Інф · 6</span><span>Цифровий слід</span><span>Ур. 26</span><span>Арк. 2</span></div>
+</section>
+
+<!-- 3 · Гра А/П -->
+<section class="sheet" id="gra" aria-labelledby="t3">
+  <div class="stack">
+    <div>
+      <div class="label">Гра · 10 дій</div>
+      <h2 class="h2" id="t3">Активний чи пасивний?</h2>
+    </div>
+    <p>Для кожної дії обери, який слід вона залишає. Пояснення з’явиться одразу.</p>
+    <ol class="quiz ap" id="ap"></ol>
+    <div class="btn-row"><span class="score" id="ap-s" aria-live="polite"></span><button type="button" class="btn" id="ap-r">Почати знову</button></div>
+  </div>
+  <div class="margin" aria-hidden="true"><span><span class="big">10</span><br>дій</span></div>
+  <div class="stamp"><span>Інф · 6</span><span>Гра А/П</span><span>Ур. 26</span><span>Арк. 3</span></div>
+</section>
+
+<!-- 4 · Стерти -->
+<section class="sheet" id="steraty" aria-labelledby="t4">
+  <div class="stack">
+    <div>
+      <div class="label">Тема 2 · цифровий слід</div>
+      <h2 class="h2" id="t4">Чи можна видалити слід назавжди?</h2>
+    </div>
+    <p>Хтось виклав фото однокласника, який заснув на уроці. Через годину передумав і натиснув «Видалити». Подивись, що від допису лишилося.</p>
+    <div class="cols cols--60">
+      <div class="stack" style="gap:12px">
+        <div class="post" id="post">
+          <div class="post-h"><span class="ava" aria-hidden="true"></span><div class="post-n">kit_painter<small>сторіс · 1 год тому</small></div></div>
+          <p class="post-body">Дивіться, як Сашко спить на інформатиці, ха-ха</p>
+          <div class="post-img" aria-hidden="true">фото однокласника</div>
+          <div class="post-f"><span>47 переглядів</span><span>12 реакцій</span></div>
+        </div>
+        <div class="btn-row"><button type="button" class="btn" id="del">Видалити допис</button><button type="button" class="btn" id="del-r" hidden>Почати знову</button><span class="gone" id="gone" hidden>видалено</span></div>
+      </div>
+      <div class="stack" style="gap:12px">
+        <h3 class="h3">Що лишилося після видалення</h3>
+        <ul class="traces" id="traces"></ul>
+        <p class="muted" id="traces-hint">Натисни «Видалити допис».</p>
+      </div>
+    </div>
+    <div class="sticky"><div class="sticky-t">Запам’ятай</div>Видалити допис ≠ видалити слід. Думай <b>до</b> публікації, а не після.</div>
+  </div>
+  <div class="margin" aria-hidden="true"><span>підр. с. 108</span></div>
+  <div class="stamp"><span>Інф · 6</span><span>Стерти?</span><span>Ур. 26</span><span>Арк. 4</span></div>
+</section>
+
+<!-- 5 · Репутація -->
+<section class="sheet" id="reputatsiia" aria-labelledby="t5">
+  <div class="stack">
+    <div>
+      <div class="label">Тема 2 · цифрова репутація</div>
+      <h2 class="h2" id="t5">Один допис — різні думки</h2>
+    </div>
+    <div class="def"><span class="def-tag">Означення</span>
+      <p class="lead"><mark>Цифрова репутація</mark> — думка, яку складають про тебе інші люди за твоїм цифровим слідом. Як відгуки про магазин: хороших треба багато, а один поганий запам’ятовують усі.</p>
+    </div>
+    <p>Обери допис і подивись, що про автора подумають різні люди.</p>
+    <div class="seg" role="group" aria-label="Допис" id="vp"></div>
+    <p class="lead" id="vp-t" aria-live="polite"></p>
+    <div class="viewers" id="viewers"></div>
+  </div>
+  <div class="margin" aria-hidden="true"><span>5 поглядів</span></div>
+  <div class="stamp"><span>Інф · 6</span><span>Репутація</span><span>Ур. 26</span><span>Арк. 5</span></div>
+</section>
+
+<!-- 6 · Публікувати чи ні -->
+<section class="sheet" id="sytuatsii" aria-labelledby="t6">
+  <div class="stack">
+    <div>
+      <div class="label">Гра · 8 ситуацій</div>
+      <h2 class="h2" id="t6">Публікувати чи ні?</h2>
+    </div>
+    <div class="dots" id="cs-dots" aria-hidden="true"></div>
+    <div class="case">
+      <div class="label" id="cs-n"></div>
+      <p class="case-q" id="cs-q" aria-live="polite"></p>
+      <div class="opts3" id="cs-o">
+        <button type="button" class="btn" data-a="1"><b>1</b>Публікую</button>
+        <button type="button" class="btn" data-a="2"><b>2</b>Змінюю й публікую</button>
+        <button type="button" class="btn" data-a="3"><b>3</b>Не публікую</button>
+      </div>
+      <p class="fb" id="cs-fb" aria-live="polite"></p>
+      <div class="btn-row"><button type="button" class="btn" id="cs-next" hidden>Наступна ситуація →</button></div>
+    </div>
+  </div>
+  <div class="margin" aria-hidden="true"><span>у чат:<br><span class="big">1·2·3</span></span></div>
+  <div class="stamp"><span>Інф · 6</span><span>Публікувати?</span><span>Ур. 26</span><span>Арк. 6</span></div>
+</section>
+
+<!-- 7 · Профіль -->
+<section class="sheet" id="profil" aria-labelledby="t7">
+  <div class="stack">
+    <div>
+      <div class="label">Культура представлення себе</div>
+      <h2 class="h2" id="t7">Збери безпечний профіль</h2>
+    </div>
+    <p>Профіль — твоя візитівка. Обери нікнейм, аватар і решту — праворуч видно, що побачить незнайомець і наскільки це ризиковано.</p>
+    <div class="pb">
+      <div id="pb-f"></div>
+      <aside class="card" aria-live="polite">
+        <div class="label">Так тебе бачать інші</div>
+        <div class="card-h"><div class="card-ava" id="pc-ava"></div><div><div class="card-nick" id="pc-nick"></div><div class="card-lock" id="pc-lock"></div></div></div>
+        <div class="card-bio" id="pc-bio"></div>
+        <div class="card-geo" id="pc-geo"></div>
+        <div><div class="label" style="color:var(--ink-muted)">Ризик</div><div class="meter"><i id="pc-m"></i></div></div>
+        <div class="verdict" id="pc-v"></div>
+      </aside>
+    </div>
+  </div>
+  <div class="margin" aria-hidden="true"><span>з 13 років</span></div>
+  <div class="stamp"><span>Інф · 6</span><span>Профіль</span><span>Ур. 26</span><span>Арк. 7</span></div>
+</section>
+
+<!-- 8 · Фільтр -->
+<section class="sheet" id="filtr" aria-labelledby="t8">
+  <div class="stack flt">
+    <div>
+      <div class="label">Культура в мережі</div>
+      <h2 class="h2" id="t8">Чотири питання перед кнопкою «Опублікувати»</h2>
+    </div>
+    <div class="cols cols--60">
+      <div class="stack" style="gap:12px">
+        <label for="draft" class="label">Чернетка допису</label>
+        <textarea id="draft" placeholder="Напиши чернетку або обери приклад нижче"></textarea>
+        <div class="btn-row" id="presets"></div>
+        <div class="chips" id="hints" aria-live="polite"></div>
+        <p class="muted" style="font-size:14.5px">Підказка помічає лише очевидне: номер телефону, адресу, школу, дати від’їзду, грубі слова. Решту перевіряєш ти.</p>
+      </div>
+      <div class="stack" style="gap:8px">
+        <div id="fq"></div>
+        <div class="out" id="f-out" aria-live="polite">Дай відповідь на всі чотири питання.</div>
+      </div>
+    </div>
+  </div>
+  <div class="margin" aria-hidden="true"><span>≈ 5 секунд</span></div>
+  <div class="stamp"><span>Інф · 6</span><span>Фільтр</span><span>Ур. 26</span><span>Арк. 8</span></div>
+</section>
+
+<!-- 9 · Якщо ображають -->
+<section class="sheet" id="dopomoha" aria-labelledby="t9">
+  <div class="stack">
+    <div>
+      <div class="label">Безпека в мережі</div>
+      <h2 class="h2" id="t9">Що робити, якщо в мережі ображають?</h2>
+    </div>
+    <div class="cols cols--60">
+      <ol class="steps">
+        <li><div><b>Не відповідай образою</b><span>Так сварка тільки розгориться. У підручнику це називають флеймом.</span></div></li>
+        <li><div><b>Зроби скриншоти</b><span>Це докази: дорослим буде легше допомогти.</span></div></li>
+        <li><div><b>Заблокуй і поскаржся</b><span>Кнопка «Поскаржитися» є в кожній соцмережі й месенджері.</span></div></li>
+        <li class="is-active"><div><b>Розкажи дорослому</b><span>Батькам, класному керівнику, шкільному психологу.</span></div></li>
+      </ol>
+      <div class="stack" style="gap:14px">
+        <div class="sticky"><div class="sticky-t">Куди дзвонити</div><b style="font-size:26px;font-family:var(--font-mono)">116 111</b><br>Національна гаряча лінія для дітей та молоді. Безкоштовно й анонімно.</div>
+        <p>Бачиш, що цькують іншого? Не лайкай і не пересилай. Підтримай людину й теж скажи дорослим.</p>
+      </div>
+    </div>
+    <div class="raised stack" style="gap:12px">
+      <h3 class="h3" id="bl-q">Під твоїм відео пишуть: «Ти смішна, видались». Що зробиш?</h3>
+      <div class="btn-row" id="bl-o"></div>
+      <p class="fb" id="bl-fb" aria-live="polite"></p>
+    </div>
+  </div>
+  <div class="margin" aria-hidden="true"><span>підр. с. 108–109</span></div>
+  <div class="stamp"><span>Інф · 6</span><span>Допомога</span><span>Ур. 26</span><span>Арк. 9</span></div>
+</section>
+
+<!-- 10 · Перевір себе -->
+<section class="sheet" id="perevir" aria-labelledby="t10">
+  <div class="stack">
+    <div>
+      <div class="label">Самоперевірка · 8 питань</div>
+      <h2 class="h2" id="t10">Перевір себе</h2>
+    </div>
+    <form class="tq" id="tq"></form>
+    <div class="btn-row"><button type="button" class="btn" id="tq-go">Перевірити</button><button type="button" class="btn" id="tq-r">Ще раз</button><span class="big-score" id="tq-s" aria-live="polite"></span></div>
+  </div>
+  <div class="margin" aria-hidden="true"><span>без оцінки</span></div>
+  <div class="stamp"><span>Інф · 6</span><span>Перевір себе</span><span>Ур. 26</span><span>Арк. 10</span></div>
+</section>
+
+<!-- 11 · Д/з -->
+<section class="sheet" id="dz" aria-labelledby="t11">
+  <div class="stack">
+    <div>
+      <div class="label">Домашнє завдання · ≈ 15 хв</div>
+      <h2 class="h2" id="t11">«Мій слід за день»</h2>
+    </div>
+    <ol class="steps">
+      <li><div><b>Склади в зошиті таблицю з трьох стовпців</b><span>Що я зробив(-ла) в мережі · Активний чи пасивний слід · Хто це бачить. Мінімум 8 рядків за один день.</span></div></li>
+      <li><div><b>Допиши висновок одним реченням</b><span>«Завтра я зроблю інакше: …»</span></div></li>
+      <li><div><b>Сфотографуй сторінку й здай у Google Classroom</b><span>Не пиши назв своїх акаунтів, нікнеймів і паролів.</span></div></li>
+    </ol>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Що я зробив(-ла) в мережі</th><th>Слід</th><th>Хто це бачить</th></tr></thead>
+      <tbody>
+        <tr class="demo"><td>Подивився відео, як зібрати будиночок у грі</td><td>пасивний</td><td>сервіс відео: запам’ятав і радить схожі</td></tr>
+        <tr class="demo"><td>Написала коментар під відео однокласниці</td><td>активний</td><td>усі, хто відкриє це відео</td></tr>
+        <tr><td>…</td><td></td><td></td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted" style="font-size:14.5px">Перші два рядки — приклад заповнення.</p>
+    <div class="cols">
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Що оцінюю</th><th>Бали</th></tr></thead>
+        <tbody>
+          <tr><td>8 рядків: усі 3 стовпці заповнено, вид сліду визначено правильно</td><td class="num">8 · по 1</td></tr>
+          <tr><td>Висновок «Завтра я зроблю інакше…»</td><td class="num">2</td></tr>
+          <tr><td>Охайно, без назв акаунтів і паролів</td><td class="num">1</td></tr>
+          <tr><td><b>Разом</b></td><td class="num">11</td></tr>
+        </tbody>
+      </table></div>
+      <div class="stack" style="gap:14px">
+        <div class="sticky"><div class="sticky-t">12 балів</div>Усе + комікс із 4 кадрів «Історія одного допису»: від публікації до наслідків. Малюй у зошиті або в Google Презентаціях.</div>
+        <p><b>Без комп’ютера:</b> завдання й так у зошиті. Немає чим сфотографувати — покажи зошит на уроці.</p>
+      </div>
+    </div>
+  </div>
+  <div class="margin" aria-hidden="true"><span>до наст. уроку</span></div>
+  <div class="stamp"><span>Інф · 6</span><span>Д/з</span><span>Ур. 26</span><span>Арк. 11</span></div>
+</section>
+</main>
+<p class="foot">Інформатика, 6 клас · урок 26 за КТП: «Культура представлення себе у мережі. Цифровий слід. Цифрова репутація». Теорія — за підручником «Формула», с. 106–111. Імена й нікнейми на сторінці вигадані.</p>
+
+<script>
+{
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const mk = (k) => `<span class="mark mark--${k}" aria-hidden="true"></span>`;
+const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+/* ── Титульний: ланцюжок слідів ── */
+const STEPS = [[178, 240, "лайк", -1], [226, 268, "", 1], [226, 310, "пошук", -1], [274, 338, "", 1], [274, 380, "фото", -1], [322, 408, "", 1], [322, 450, "коментар", -1], [370, 478, "", 1], [370, 520, "геомітка", -1]];
+$("#trail").innerHTML = STEPS.map(([x, y, w, side], i) => {
+  const r = -28 + side * 6;
+  const sole = `<g class="fp" style="animation-delay:${0.25 + i * 0.3}s" transform="translate(${x} ${y}) rotate(${r})">
+    <ellipse cx="0" cy="-9" rx="11" ry="15" fill="${i % 2 ? "none" : "url(#hatch)"}" stroke="currentColor" stroke-width="2.5"/>
+    <ellipse cx="0" cy="15" rx="7" ry="8" fill="none" stroke="currentColor" stroke-width="2.5"/></g>`;
+  const lbl = w ? `<text class="fp" style="animation-delay:${0.4 + i * 0.3}s" x="${side < 0 ? x - 26 : x + 24}" y="${y + 6}" text-anchor="${side < 0 ? "end" : "start"}">${w}</text>` : "";
+  return sole + lbl;
+}).join("");
+
+/* ── Гра «Активний чи пасивний?» ── */
+const AP = [
+  ["Ставиш лайк під відео в TikTok", "А", "Лайк бачать автор і інші глядачі — ти залишив(-ла) його сам(-а)."],
+  ["YouTube запам’ятовує, які відео ти переглянув(-ла)", "П", "Історію переглядів сервіс збирає сам, щоб радити схожі відео."],
+  ["Додаток погоди сам визначає твоє місто", "П", "Місце телефону визначається автоматично — ти нічого не публікуєш."],
+  ["Пишеш коментар під дописом блогера", "А", "Коментар ти пишеш сам(-а), і його читають усі."],
+  ["Обираєш нікнейм і аватар у Roblox", "А", "Нікнейм і аватар бачать усі гравці — це твій вибір."],
+  ["Телефон сам додає до фото місце зйомки", "П", "Геомітка записується у файл фото автоматично. Вимкни її в налаштуваннях камери."],
+  ["Історія версій зберігає, хто й коли змінював файл", "П", "Google записує зміни сам — ти лише редагуєш презентацію."],
+  ["Викладаєш свій малюнок у спільноту художників", "А", "Ти публікуєш малюнок, щоб його побачили."],
+  ["Месенджер показує другові, що ти прочитав(-ла) повідомлення", "П", "Позначку «прочитано» месенджер ставить сам."],
+  ["Пишеш відгук про гру в Google Play", "А", "Відгук ти пишеш сам(-а), і його бачать інші гравці."],
+];
+const apState = [];
+function apRender() {
+  apState.length = 0;
+  $("#ap").innerHTML = AP.map(([t], i) => `<li><p><span class="n">${i + 1}</span>${esc(t)}</p>
+    <div class="btn-row"><button type="button" class="btn" data-i="${i}" data-a="А">Активний</button><button type="button" class="btn" data-i="${i}" data-a="П">Пасивний</button></div>
+    <p class="fb" id="ap-fb${i}"></p></li>`).join("");
+  apScore();
+}
+function apScore() {
+  const done = apState.filter((v) => v !== undefined).length, ok = apState.filter(Boolean).length;
+  $("#ap-s").textContent = done ? `Правильно: ${ok} з ${done}${done === AP.length ? (ok === AP.length ? ". Усі 10 — чудово." : ". Переглянь пояснення до помилок.") : ""}` : "Відповідай по черзі або вибірково.";
+}
+$("#ap").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-a]"); if (!b) return;
+  const i = +b.dataset.i; if (apState[i] !== undefined) return;
+  const right = AP[i][1], ok = b.dataset.a === right;
+  apState[i] = ok;
+  b.classList.add(ok ? "is-ok" : "is-bad");
+  if (!ok) $$(`button[data-i="${i}"]`, $("#ap")).find((x) => x.dataset.a === right).classList.add("is-ok");
+  $(`#ap-fb${i}`).innerHTML = `${mk(ok ? "check" : "cross")}<span><b>${right === "А" ? "Активний" : "Пасивний"}.</b> ${esc(AP[i][2])}</span>`;
+  apScore();
+});
+$("#ap-r").addEventListener("click", apRender);
+apRender();
+
+/* ── Видалений допис ── */
+const TR = [
+  ["скриншот", "Марта встигла зробити знімок екрана «для сміху»."],
+  ["переслано", "Олег переслав сторіс у чат класу — там 28 людей."],
+  ["переслано", "З чату класу фото пішло в чат секції з волейболу."],
+  ["коментар", "Хтось відповів на сторіс, і цитата лишилася в листуванні."],
+  ["сервер", "Сервіс ще якийсь час може зберігати копію на своїх серверах."],
+  ["пам’ять", "Сашко бачив допис і пам’ятає, хто його виклав."],
+];
+let delTimers = [];
+$("#del").addEventListener("click", () => {
+  $("#post").classList.add("is-del"); $("#del").disabled = true; $("#gone").hidden = false; $("#traces-hint").hidden = true;
+  $("#traces").innerHTML = TR.map(([t, d]) => `<li><span class="tag">${t}</span><span>${esc(d)}</span></li>`).join("");
+  $$("#traces li").forEach((li, i) => delTimers.push(setTimeout(() => li.classList.add("is-on"), 350 + i * 550)));
+  delTimers.push(setTimeout(() => { $("#del-r").hidden = false; }, 350 + TR.length * 550));
+});
+$("#del-r").addEventListener("click", () => {
+  delTimers.forEach(clearTimeout); delTimers = [];
+  $("#post").classList.remove("is-del"); $("#del").disabled = false; $("#gone").hidden = true; $("#del-r").hidden = true;
+  $("#traces").innerHTML = ""; $("#traces-hint").hidden = false;
+});
+
+/* ── Один допис — різні думки ── */
+const VP = [
+  { b: "Сальто на батуті", t: "Відео: «Уперше зробив сальто на батуті!»", v: [
+    ["Друг", "Круто! Навчиш?", "ok"], ["Учитель фізкультури", "Молодець, тільки зі страховкою.", "ok"], ["Тренер секції", "Сміливий — покличу на пробне тренування.", "ok"],
+    ["Незнайомець", "Просто відео, особистого не видно.", "mid"], ["Ти через 5 років", "Смішно, але не соромно.", "ok"]] },
+  { b: "Мем про вчительку", t: "Фото вчительки без дозволу з підписом «Коли завтра контрольна»", v: [
+    ["Друг", "Ха-ха, перешлю далі.", "mid"], ["Учителька", "Неприємно: фото зроблено без дозволу.", "bad"], ["Тренер секції", "Висміює людей. Чи візьму в команду?", "bad"],
+    ["Незнайомець", "Мем уже не твій — гуляє чатами.", "bad"], ["Ти через 5 років", "Соромно, а видалити всі копії не вийде.", "bad"]] },
+  { b: "Новий велосипед", t: "Фото нового велосипеда біля під’їзду — видно номер будинку", v: [
+    ["Друг", "Класний велик!", "ok"], ["Батьки", "Видно адресу й що велосипед дорогий.", "bad"], ["Тренер секції", "Звичайне фото.", "mid"],
+    ["Незнайомець", "Тепер знаю, де він стоїть.", "bad"], ["Ти через 5 років", "Нічого страшного, але адресу краще обрізати.", "mid"]] },
+];
+let vpCur = 0;
+$("#vp").innerHTML = VP.map((p, i) => `<button type="button" data-i="${i}">${esc(p.b)}</button>`).join("");
+function vpRender() {
+  $$("#vp button").forEach((b, i) => b.classList.toggle("is-on", i === vpCur));
+  const p = VP[vpCur];
+  $("#vp-t").innerHTML = `<b>Допис:</b> ${esc(p.t)}`;
+  const word = { ok: ["check", "думка добра"], bad: ["cross", "думка погана"], mid: ["dash", "без змін"] };
+  $("#viewers").innerHTML = p.v.map(([w, s, k]) => `<div class="viewer v-${k}"><div class="who">${esc(w)}</div><div class="say">«${esc(s)}»</div><div class="v">${mk(word[k][0])}${word[k][1]}</div></div>`).join("");
+}
+$("#vp").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { vpCur = +b.dataset.i; vpRender(); } });
+vpRender();
+
+/* ── Публікувати чи ні ── */
+const CS = [
+  ["Однокласник смішно заснув на уроці. Сфотографувати й викласти в сторіс?", 3, "Фото людини — лише з її дозволу. А фото, яке висміює, псує репутацію і йому, і тобі (підр. с. 110)."],
+  ["Твій комікс про кота готовий. Викласти його в спільноту художників під нікнеймом?", 1, "Так ти показуєш, що вмієш, — це слід, яким можна пишатися. Підпис нікнеймом, без прізвища й школи."],
+  ["Сім’я на два тижні їде в Карпати. Викласти фото з геоміткою: «Нас не буде до 15-го!»?", 2, "Фото — після повернення й без геомітки. Інакше всі знають, що квартира порожня."],
+  ["Улюблений блогер випустив слабке відео. Написати в коментарях: «Ти тупий, відписуюсь»?", 2, "Думку сказати можна, образу — ні: «Цього разу не сподобалось, бо…»."],
+  ["Над містом працює ППО. Зняти відео й одразу викласти, поки все видно?", 3, "Під час тривоги — в укриття. Відео роботи ППО й місць влучань допомагають ворогу, їх не можна публікувати."],
+  ["Друг надіслав тобі в особисті своє смішне фото. Переслати в чат класу?", 3, "Він надіслав його тільки тобі. Хочеш поділитися — спершу спитай дозволу."],
+  ["Ти виграв(-ла) шкільну олімпіаду, і школа виклала новину. Поширити її в себе?", 1, "Новина про досягнення — добрий слід. Школа вже опублікувала її сама."],
+  ["Хочеш показати нові кросівки, але на фото видно номер твого будинку. Викласти?", 2, "Обріж фото, щоб номера не було видно, — і публікуй."],
+];
+const csRes = []; let csCur = 0;
+const ANS = { 1: "1 · публікую", 2: "2 · змінюю й публікую", 3: "3 · не публікую" };
+function csDots() { $("#cs-dots").innerHTML = CS.map((_, i) => `<i class="${csRes[i] === undefined ? "" : csRes[i] ? "is-ok" : "is-bad"}${i === csCur ? " is-cur" : ""}"></i>`).join(""); }
+function csShow() {
+  if (csCur >= CS.length) {
+    const ok = csRes.filter(Boolean).length;
+    $("#cs-n").textContent = "Підсумок";
+    $("#cs-q").textContent = `Збіглося з відповіддю вчителя: ${ok} з ${CS.length}.`;
+    $("#cs-o").hidden = true; $("#cs-fb").innerHTML = "Різні думки — це нормально. Головне, щоб ти міг (могла) пояснити свій вибір.";
+    $("#cs-next").textContent = "Зіграти ще раз"; $("#cs-next").hidden = false; csDots(); return;
+  }
+  $("#cs-n").textContent = `Ситуація ${csCur + 1} / ${CS.length}`;
+  $("#cs-q").textContent = CS[csCur][0];
+  $("#cs-o").hidden = false; $$("#cs-o .btn").forEach((b) => b.classList.remove("is-ok", "is-bad"));
+  $("#cs-fb").innerHTML = ""; $("#cs-next").hidden = true; csDots();
+}
+$("#cs-o").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-a]"); if (!b || csRes[csCur] !== undefined) return;
+  const [, a, why] = CS[csCur], ok = +b.dataset.a === a;
+  csRes[csCur] = ok;
+  b.classList.add(ok ? "is-ok" : "is-bad");
+  $$("#cs-o .btn").forEach((x) => { if (+x.dataset.a === a) x.classList.add("is-ok"); });
+  $("#cs-fb").innerHTML = `${mk(ok ? "check" : "cross")}<span><b>${ANS[a]}.</b> ${esc(why)}</span>`;
+  $("#cs-next").textContent = csCur === CS.length - 1 ? "Підсумок →" : "Наступна ситуація →"; $("#cs-next").hidden = false; csDots();
+});
+$("#cs-next").addEventListener("click", () => {
+  if (csCur >= CS.length) { csRes.length = 0; csCur = 0; } else csCur++;
+  csShow();
+});
+csShow();
+
+/* ── Конструктор профілю ── */
+const AV = {
+  selfie: '<svg viewBox="0 0 84 84"><circle cx="42" cy="32" r="15" fill="none" stroke="currentColor" stroke-width="3"/><path d="M14 84c3-20 15-29 28-29s25 9 28 29" fill="none" stroke="currentColor" stroke-width="3"/><text x="42" y="80" text-anchor="middle" font-size="11" font-family="IBM Plex Mono" fill="currentColor">ФОТО</text></svg>',
+  uniform: '<svg viewBox="0 0 84 84"><circle cx="42" cy="30" r="14" fill="none" stroke="currentColor" stroke-width="3"/><path d="M12 84c3-20 16-30 30-30s27 10 30 30" fill="none" stroke="currentColor" stroke-width="3"/><path d="M42 54l-6 30M42 54l6 30" stroke="currentColor" stroke-width="3"/><rect x="52" y="62" width="10" height="10" fill="currentColor"/></svg>',
+  draw: '<svg viewBox="0 0 84 84"><path d="M42 14l8 18 19 2-14 13 4 19-17-10-17 10 4-19-14-13 19-2z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>',
+  land: '<svg viewBox="0 0 84 84"><circle cx="60" cy="26" r="8" fill="none" stroke="currentColor" stroke-width="3"/><path d="M4 70l22-26 14 16 12-12 28 22" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>',
+};
+const PB = [
+  { id: "nick", l: "Нікнейм", o: [
+    ["olena_koval_2014", 2, "Ім’я, прізвище й рік народження — за ними тебе легко знайти."],
+    ["liceum_6b_olena", 2, "Видно школу й клас — незнайомець знає, де тебе шукати."],
+    ["olena.kyiv", 1, "Ім’я й місто — уже підказка. Краще вигадане слово."],
+    ["pixel_pinguin", 0, "Вигаданий нікнейм нічого не розповідає про тебе."]] },
+  { id: "ava", l: "Аватар", o: [
+    ["Селфі обличчям", 2, "Справжнє фото легко скопіювати й використати.", "selfie"],
+    ["Фото в шкільній формі", 2, "Форма й емблема підказують, де ти навчаєшся.", "uniform"],
+    ["Власний малюнок", 0, "Малюнок замість фото — порада з підручника (с. 111).", "draw"],
+    ["Краєвид", 0, "Красиво й нічого не видає.", "land"]] },
+  { id: "bio", l: "«Про себе»", o: [
+    ["Київ, ліцей № …, 6-Б", 2, "Місто, школа й клас — забагато для незнайомців."],
+    ["Пиши в особисті: 0__ ___ __ __", 2, "Номер телефону не пишуть у профілі ніколи."],
+    ["Малюю, граю у волейбол", 0, "Захоплення — хороша візитівка."],
+    ["Тут без особистого", 0, "Можна й так."]] },
+  { id: "vis", l: "Хто бачить профіль", o: [
+    ["Усі, навіть незнайомці", 2, "Відкритий профіль бачить будь-хто."],
+    ["Лише друзі", 0, "Закритий профіль — але й друзі можуть переслати."]] },
+  { id: "geo", l: "Геомітки на фото", o: [
+    ["Увімкнено", 2, "Кожне фото показує, де ти був(-ла)."],
+    ["Вимкнено", 0, "Місце зйомки не потрапить у фото."]] },
+];
+const pb = { nick: 0, ava: 0, bio: 0, vis: 0, geo: 0 };
+$("#pb-f").innerHTML = PB.map((g) => `<fieldset><legend>${g.l}</legend><div class="row">${g.o.map((o, i) => `<button type="button" class="btn" data-g="${g.id}" data-i="${i}">${esc(o[0])}</button>`).join("")}</div><p class="tip" id="tip-${g.id}"></p></fieldset>`).join("");
+function pbRender() {
+  let risk = 0;
+  PB.forEach((g) => {
+    const o = g.o[pb[g.id]]; risk += o[1];
+    $$(`button[data-g="${g.id}"]`).forEach((b) => b.classList.toggle("is-on", +b.dataset.i === pb[g.id]));
+    $(`#tip-${g.id}`).innerHTML = `${mk(o[1] ? "cross" : "check")}<span>${esc(o[2])}</span>`;
+  });
+  const P = (id) => PB.find((g) => g.id === id).o[pb[id]];
+  $("#pc-nick").textContent = "@" + P("nick")[0];
+  $("#pc-ava").innerHTML = AV[P("ava")[3]];
+  $("#pc-bio").textContent = P("bio")[0];
+  $("#pc-lock").textContent = pb.vis ? "закритий профіль" : "відкритий для всіх";
+  $("#pc-geo").textContent = pb.geo ? "геомітки вимкнено" : "на фото видно місце зйомки";
+  const max = 10, pct = Math.round((risk / max) * 100), m = $("#pc-m");
+  m.style.width = Math.max(pct, 4) + "%"; m.className = risk >= 6 ? "hi" : risk >= 2 ? "mid" : "";
+  $("#pc-v").textContent = risk === 0 ? "Профіль-візитівка: безпечно" : risk >= 6 ? "Профіль-підказка для шахрая" : "Майже добре — є що виправити";
+  $("#pc-v").style.color = risk === 0 ? "var(--check)" : risk >= 6 ? "var(--error)" : "var(--signal-ink)";
+}
+$("#pb-f").addEventListener("click", (e) => { const b = e.target.closest("button[data-g]"); if (b) { pb[b.dataset.g] = +b.dataset.i; pbRender(); } });
+pbRender();
+
+/* ── Фільтр перед публікацією ── */
+const FQ = ["Це правда?", "Це нікого не образить?", "Тут немає адреси, школи, телефону?", "Мені буде не соромно за це через 5 років?"];
+const fa = [null, null, null, null];
+$("#fq").innerHTML = FQ.map((q, i) => `<div class="qrow" id="qr${i}"><span>${i + 1}. ${q}</span><div class="seg" role="group" aria-label="${q}"><button type="button" data-q="${i}" data-v="1">Так</button><button type="button" data-q="${i}" data-v="0">Ні</button></div></div>`).join("");
+function fRender() {
+  FQ.forEach((_, i) => {
+    $$(`button[data-q="${i}"]`).forEach((b) => b.classList.toggle("is-on", fa[i] !== null && +b.dataset.v === fa[i]));
+    $(`#qr${i}`).classList.toggle("is-no", fa[i] === 0);
+  });
+  const out = $("#f-out");
+  if (fa.includes(0)) { out.className = "out is-bad"; out.innerHTML = `${mk("cross")}Є «ні» — не публікуй або зміни допис.`; }
+  else if (fa.includes(null)) { out.className = "out"; out.textContent = "Дай відповідь на всі чотири питання."; }
+  else { out.className = "out is-ok"; out.innerHTML = `${mk("check")}Усі чотири «так» — можна публікувати.`; }
+}
+$("#fq").addEventListener("click", (e) => { const b = e.target.closest("button[data-q]"); if (b) { fa[+b.dataset.q] = +b.dataset.v; fRender(); } });
+const PRE = [
+  ["Мій малюнок", "Намалювала свого кота в стилі коміксу. Як вам?"],
+  ["Ми на морі", "Ми з батьками в Одесі до 20-го, вдома нікого)) Ось наш пляж"],
+  ["Новий номер", "Нарешті свій телефон! Пишіть: 0__ ___ __ __"],
+  ["Про однокласника", "Дивіться, який Петро тупий на фото з фізкультури"],
+];
+$("#presets").innerHTML = PRE.map((p, i) => `<button type="button" class="btn" data-p="${i}">${esc(p[0])}</button>`).join("");
+$("#presets").addEventListener("click", (e) => { const b = e.target.closest("button[data-p]"); if (!b) return; $("#draft").value = PRE[+b.dataset.p][1]; fa.fill(null); fRender(); hints(); });
+const HINTS = [
+  [/(\+?38)?[\s(]*0[\d_]{2}[\s)-]*[\d_]{3}[\s-]*[\d_]{2}[\s-]*[\d_]{2}/, "номер телефону"],
+  [/вул\.|вулиц|просп|провул|будин|під’їзд|під'їзд|кв\.\s*\d/i, "адреса"],
+  [/школ|ліце|гімназ|\b\d{1,2}-[А-ЯІЇЄҐа-яіїєґ]\b/i, "школа чи клас"],
+  [/не буде|нікого вдома|вдома нікого|поїхали|їдемо|до \d{1,2}(-го)?\b/i, "дати від’їзду"],
+  [/туп|дурн|лох|ідіот|ненавиджу|відстій/i, "образа"],
+];
+function hints() {
+  const t = $("#draft").value.trim();
+  const found = HINTS.filter(([re]) => re.test(t)).map(([, n]) => n);
+  $("#hints").innerHTML = !t ? "" : found.length ? `<span class="label" style="color:var(--error)">Схоже на:</span>` + found.map((n) => `<span class="chip">${n}</span>`).join("") : `<span class="chip ok">Очевидних особистих даних не видно</span>`;
+}
+$("#draft").addEventListener("input", hints);
+fRender();
+
+/* ── Якщо ображають ── */
+const BL = [
+  ["Напишу ще грубіше у відповідь", "cross", "Так почнеться «словесна війна» — флейм. Образи тільки посиляться."],
+  ["Зроблю скриншоти, заблокую й скажу дорослому", "check", "Саме так: докази, блок, скарга й допомога дорослого."],
+  ["Видалю відео й нікому не скажу", "dash", "Відео можна прибрати, але про образи треба розповісти — сам(-а) ти не винен(-на)."],
+  ["Перешлю образи в чат класу, хай усі знають", "cross", "Так образи побачить ще більше людей. Покажи їх дорослому, а не всім."],
+];
+$("#bl-o").innerHTML = shuffle(BL).map((o) => `<button type="button" class="btn" data-k="${o[1]}" data-w="${esc(o[2])}">${esc(o[0])}</button>`).join("");
+$("#bl-o").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  $$("#bl-o .btn").forEach((x) => x.classList.remove("is-ok", "is-bad"));
+  b.classList.add(b.dataset.k === "check" ? "is-ok" : b.dataset.k === "cross" ? "is-bad" : "is-on");
+  $("#bl-fb").innerHTML = `${mk(b.dataset.k)}<span>${b.dataset.w}</span>`;
+});
+
+/* ── Перевір себе ── */
+const TQ = [
+  ["Цифровий слід — це…", ["уся інформація про тебе, яку ти залишаєш у мережі", "список сайтів, доданих у закладки браузера", "паролі від усіх твоїх акаунтів у соцмережах", "фото, які зберігаються лише в пам’яті телефона"], 0],
+  ["Який слід — пасивний?", ["коментар під відео однокласника", "історія твоїх пошукових запитів", "фото, яке ти виклав(-ла) в сторіс", "відгук про гру в магазині застосунків"], 1],
+  ["Ти видалив(-ла) допис через годину. Що правда?", ["його точно вже ніхто ніколи не побачить", "хтось міг устигнути зробити скриншот", "він сам зникне з телефонів усіх друзів", "видалений допис стане видно лише тобі"], 1],
+  ["Цифрова репутація — це…", ["кількість підписників у твоїй соцмережі", "думка інших про тебе за твоїм слідом", "рейтинг твого акаунта в улюбленій грі", "кількість лайків під останнім дописом"], 1],
+  ["Який нікнейм найбезпечніший?", ["olena_koval_2014", "pixel_pinguin", "liceum_6b_olena", "olena.kyiv.2014"], 1],
+  ["Фото з відпочинку краще викласти…", ["одразу й з геоміткою, щоб друзі знайшли", "після повернення й без геомітки", "з підписом, до якого числа вас не буде", "у відкритий профіль, щоб побачили всі"], 1],
+  ["Тебе ображають у коментарях. Що зробити?", ["відповісти ще грубіше, щоб відстали", "зробити скриншоти й розповісти дорослому", "мовчки терпіти й нікому не казати", "переслати образи в загальний чат класу"], 1],
+  ["Що з цього публікувати не можна?", ["свій малюнок про весну", "відео роботи ППО", "відгук про прочитану книжку", "новину про шкільну олімпіаду"], 1],
+];
+let tqOrder = [];
+function tqRender() {
+  tqOrder = TQ.map((q) => shuffle(q[1].map((t, i) => i)));
+  $("#tq").innerHTML = TQ.map((q, qi) => `<fieldset id="tq${qi}"><legend>${esc(q[0])}</legend>${tqOrder[qi].map((oi) => `<label><input type="radio" name="q${qi}" value="${oi}"><span>${esc(q[1][oi])}</span></label>`).join("")}</fieldset>`).join("");
+  $("#tq-s").textContent = "";
+}
+$("#tq-go").addEventListener("click", () => {
+  let ok = 0, got = 0;
+  TQ.forEach((q, qi) => {
+    const fs = $(`#tq${qi}`), sel = $(`input[name="q${qi}"]:checked`, fs);
+    $$("label", fs).forEach((l) => l.classList.remove("is-ok", "is-bad"));
+    const right = $(`input[value="${q[2]}"]`, fs).closest("label");
+    if (sel) { const good = +sel.value === q[2]; ok += good; got++; if (!good) sel.closest("label").classList.add("is-bad"); right.classList.add("is-ok"); fs.className = good ? "done-ok" : "done-bad"; }
+    else fs.className = "";
+  });
+  $("#tq-s").textContent = got === TQ.length ? `${ok} / ${TQ.length}` : `${ok} / ${got} · без відповіді: ${TQ.length - got}`;
+});
+$("#tq-r").addEventListener("click", tqRender);
+tqRender();
+
+/* ── Підсвітка розділу в меню ── */
+const links = $$(".topnav a");
+const navObs = new IntersectionObserver((es) => es.forEach((en) => {
+  if (en.isIntersecting) links.forEach((a) => a.classList.toggle("is-on", a.getAttribute("href") === "#" + en.target.id));
+}), { rootMargin: "-40% 0px -55% 0px" });
+$$("main .sheet[id]").forEach((s) => navObs.observe(s));
+}
+</script>
+</body>
+</html>
